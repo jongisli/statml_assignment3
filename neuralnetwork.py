@@ -2,7 +2,9 @@
 import numpy as np
 from numpy import random as rnd
 import matplotlib.pyplot as plt
-from math import log
+from math import log, sin
+
+img_format = 'png'
 
 def transfer_function(a):
     return a / float((1 + abs(a)))
@@ -56,7 +58,7 @@ neural network. Note that we append a 1 to the output weights,
 this is to represent the bias parameter.
 """
 def create_weights(M):
-    return (rnd.randn(M,2), np.insert(rnd.randn(1,M),M,1,axis=1))
+    return (rnd.sample([M,2]), rnd.sample([1,M+1]))
 
 
 def steepest_decent_training(max_iter, training_data, M, step_size):
@@ -68,17 +70,18 @@ def steepest_decent_training(max_iter, training_data, M, step_size):
     
     for i in range(0,max_iter):
         dE1, dE2 = np.zeros(w1.shape), np.zeros(w2.shape)
+        
         grad = error_backpropagation(w1,w2,h,dh)
         NN = neural_network(w1,w2,h)
 
-        # Compute the compound gradient for all training patterns
+        # Compute the average gradient for all training patterns
         # for the batch training.
         err = 0
         for x,t in data:
             err += (NN(np.array([[x],[1]]))[0] - t)**2
-            new_dE1, new_dE2 = grad(np.array([[x],[1]]),t)            
-            dE1 += new_dE1.T
-            dE2 += new_dE2.T
+            new_dE1, new_dE2 = grad(np.array([[x],[1]]),t)      
+            dE1 += new_dE1 / float(training_data.shape[0])
+            dE2 += new_dE2.T / float(training_data.shape[0])
         error.append(err / float(training_data.shape[0]))
 
         w1 = w1 - step_size * dE1
@@ -102,7 +105,7 @@ def verify_gradient(M,e):
     w1, w2 = create_weights(5)
 
     # Compute the difference between backpropagation and
-    # finite differences for changing the input weights
+    # finite differences for changing the layer 1 weights
     w1_diff = np.zeros(w1.shape)
     for i in range(0,M):
         for j in [0,1]:
@@ -118,27 +121,73 @@ def verify_gradient(M,e):
             
             w1_diff[i,j] = abs(fin_diff - dE[i,j])
 
-    #w2_diff = np.zeros(w2.shape)
-    return w1_diff
+    # Compute the difference between backpropagation and
+    # finite differences for changing the layer 2 weights
+    w2_diff = np.zeros(w2.shape)
+    for i in range(0,M+1):
+        w2_e = np.copy(w2)
+        w2_e[0,i] += e
 
+        NN = neural_network(w1,w2,h)
+        NN_e = neural_network(w1,w2_e,h)
+        fin_diff = (E(NN_e(x)[0],t) - E(NN(x)[0],t)) / e
+
+        grad = error_backpropagation(w1,w2,h,dh)
+        _, dE = grad(x,t)
+
+        w2_diff[0,i] = abs(fin_diff - dE[i])
+    
+    return (w1_diff, w2_diff)
+
+def create_plots(iterations, data, M, step_size):
+    NN_b, NN_a, E = steepest_decent_training(iterations, data, M, step_size)
+
+    X = data[:,0]
+    X_cont = np.arange(-10,10,0.1)
+    
+    t = data[:,1]
+    Y = [NN_a(np.array([[x],[1]]))[0] for x in X_cont]
+    f = np.vectorize(lambda(x): sin(x) / x)
+
+    plt.figure(1)
+    plt.plot(X_cont,Y,label='Neural network \n (M = %d)' % M)
+    plt.plot(X_cont,f(X_cont),label='sinc(x)')
+    plt.legend()
+    plt.savefig('images/nn_vs_real_%d.%s' % (iterations,img_format), format=img_format)
+
+    plt.figure(2)
+    plt.plot(X_cont,Y,label='Neural network \n (M = %d)' % M)
+    plt.scatter(X,t,color='red',label='Training data')
+    plt.legend()
+    plt.savefig('images/nn_vs_training_%d.%s' % (iterations,img_format), format=img_format)
+
+    plt.figure(3)
+    plt.plot(E, label='Error (M = %d)' % M)
+    plt.yscale('log')
+    plt.legend()
+    plt.savefig('images/error_%d.%s' % (iterations,img_format), format=img_format)
+    
+    plt.show()
+    
 
 if __name__ == "__main__":
-    print verify_gradient(5,0.000001)
+    f = open('data/sincTrain25.dt')
+    data = np.loadtxt(f)
+    
+    create_plots(10000, data, 20, 0.1)
 
-
-    """
+if __name__ == "__main__1":
     f = open('data/sincTrain25.dt')
     data = np.loadtxt(f)
     M = 20
-    NN_b, NN_a, E = steepest_decent_training(10000,data,M,0.001)
+    NN_b, NN_a, E = steepest_decent_training(10000, data, M, 0.05, 0.01)
 
-    #plt.plot(E)
-    #plt.yscale('log')
-    #plt.show()
-
+    plt.plot(E)
+    plt.yscale('log')
+    plt.show()
 
     X = data[:,0]
-    X_cont = np.arange(min(X),max(X),0.1)
+    X_cont = np.arange(-10,10,0.1)
     t = data[:,1]
     first_guess = [NN_b(np.array([[x],[1]]))[0] for x in X_cont]
     Y = [NN_a(np.array([[x],[1]]))[0] for x in X_cont]
@@ -148,4 +197,3 @@ if __name__ == "__main__":
     plt.plot(X_cont,Y,color='green',label='result')
     plt.legend()
     plt.show()
-    """
