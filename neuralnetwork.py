@@ -90,54 +90,55 @@ def steepest_decent_training(max_iter, training_data, M, step_size):
     return (NN_before, neural_network(w1,w2,h), error)
 
 
-def verify_gradient(M,e):
+def verify_gradient(M,e,number_test_patterns):
     f = open('data/sincTrain25.dt')
     data = np.loadtxt(f)
 
     # We use the first training pattern to verify our gradient
-    x,t = data[0]
-    x = np.array([[x],[1]])
-    
-    h = transfer_function
-    dh = transfer_function_derivative
-    E = error_function
+    for x,t in data[0:number_test_patterns]:
+        x = np.array([[x],[1]])
 
-    w1, w2 = create_weights(5)
+        h = transfer_function
+        dh = transfer_function_derivative
+        E = error_function
 
-    # Compute the difference between backpropagation and
-    # finite differences for changing the layer 1 weights
-    w1_diff = np.zeros(w1.shape)
-    for i in range(0,M):
-        for j in [0,1]:
-            w1_e = np.copy(w1)
-            w1_e[i,j] += e
-            
+        w1, w2 = create_weights(M)
+
+        # Compute the difference between backpropagation and
+        # finite differences for changing the layer 1 weights
+        w1_diff = np.zeros(w1.shape)
+        for i in range(0,M):
+            for j in [0,1]:
+                w1_e = np.copy(w1)
+                w1_e[i,j] += e
+
+                NN = neural_network(w1,w2,h)
+                NN_e = neural_network(w1_e,w2,h)
+                fin_diff = (E(NN_e(x)[0],t) - E(NN(x)[0],t)) / e
+
+                grad = error_backpropagation(w1,w2,h,dh)
+                dE, _ = grad(x,t)
+
+                w1_diff[i,j] += abs(fin_diff - dE[i,j]) / 5.0
+
+        # Compute the difference between backpropagation and
+        # finite differences for changing the layer 2 weights
+        w2_diff = np.zeros(w2.shape)
+        for i in range(0,M+1):
+            w2_e = np.copy(w2)
+            w2_e[0,i] += e
+
             NN = neural_network(w1,w2,h)
-            NN_e = neural_network(w1_e,w2,h)
+            NN_e = neural_network(w1,w2_e,h)
             fin_diff = (E(NN_e(x)[0],t) - E(NN(x)[0],t)) / e
 
             grad = error_backpropagation(w1,w2,h,dh)
-            dE, _ = grad(x,t)
-            
-            w1_diff[i,j] = abs(fin_diff - dE[i,j])
+            _, dE = grad(x,t)
 
-    # Compute the difference between backpropagation and
-    # finite differences for changing the layer 2 weights
-    w2_diff = np.zeros(w2.shape)
-    for i in range(0,M+1):
-        w2_e = np.copy(w2)
-        w2_e[0,i] += e
+            w2_diff[0,i] += abs(fin_diff - dE[i]) / 5.0
 
-        NN = neural_network(w1,w2,h)
-        NN_e = neural_network(w1,w2_e,h)
-        fin_diff = (E(NN_e(x)[0],t) - E(NN(x)[0],t)) / e
-
-        grad = error_backpropagation(w1,w2,h,dh)
-        _, dE = grad(x,t)
-
-        w2_diff[0,i] = abs(fin_diff - dE[i])
-    
-    return (w1_diff, w2_diff)
+    # We don't return the partial derivative for the bias to the output
+    return (w1_diff, w2_diff[[0],0:20])
 
 def create_plots(iterations, data, M, step_size):
     NN_b, NN_a, E = steepest_decent_training(iterations, data, M, step_size)
@@ -153,47 +154,35 @@ def create_plots(iterations, data, M, step_size):
     plt.plot(X_cont,Y,label='Neural network \n (M = %d)' % M)
     plt.plot(X_cont,f(X_cont),label='sinc(x)')
     plt.legend()
-    plt.savefig('images/nn_vs_real_%d.%s' % (iterations,img_format), format=img_format)
+    plt.savefig('images/nn_vs_real_%d_%d.%s' % (iterations,M,img_format), format=img_format)
 
     plt.figure(2)
     plt.plot(X_cont,Y,label='Neural network \n (M = %d)' % M)
     plt.scatter(X,t,color='red',label='Training data')
     plt.legend()
-    plt.savefig('images/nn_vs_training_%d.%s' % (iterations,img_format), format=img_format)
+    plt.savefig('images/nn_vs_training_%d_%d.%s' % (iterations,M,img_format), format=img_format)
 
     plt.figure(3)
     plt.plot(E, label='Error (M = %d)' % M)
     plt.yscale('log')
     plt.legend()
-    plt.savefig('images/error_%d.%s' % (iterations,img_format), format=img_format)
+    plt.savefig('images/error_%d_%d.%s' % (iterations,M,img_format), format=img_format)
     
     plt.show()
     
 
 if __name__ == "__main__":
-    f = open('data/sincTrain25.dt')
-    data = np.loadtxt(f)
+    """
+    d1,d2 = verify_gradient(20,10**(-6),5)
+    print np.sum(d1)/20 + np.sum(d2)/20
+    """
+    low = 0.001
+    med = 0.1
+    high = 1
+    high_ = 0.2
     
-    create_plots(10000, data, 20, 0.1)
-
-if __name__ == "__main__1":
     f = open('data/sincTrain25.dt')
     data = np.loadtxt(f)
-    M = 20
-    NN_b, NN_a, E = steepest_decent_training(10000, data, M, 0.05, 0.01)
-
-    plt.plot(E)
-    plt.yscale('log')
-    plt.show()
-
-    X = data[:,0]
-    X_cont = np.arange(-10,10,0.1)
-    t = data[:,1]
-    first_guess = [NN_b(np.array([[x],[1]]))[0] for x in X_cont]
-    Y = [NN_a(np.array([[x],[1]]))[0] for x in X_cont]
-
-    plt.scatter(X,t,color='red',label='training')
-    plt.plot(X_cont,first_guess,color='blue',label='initial guess')
-    plt.plot(X_cont,Y,color='green',label='result')
-    plt.legend()
-    plt.show()
+    create_plots(10000, data, 20, high_)
+    
+    
