@@ -172,17 +172,13 @@ def create_plots(iterations, data, M, step_size):
     
 
 if __name__ == "__main__":
-    """
+    print r'Verifying gradient'
     d1,d2 = verify_gradient(20,10**(-6),5)
     print np.sum(d1)/20 + np.sum(d2)/20
-    """
-    low = 0.001
-    med = 0.1
-    high = 1
-    high_ = 0.2
-    
+
+    print r'Creating plots with 20 hidden nodes and eta=0.1 (see /images/...)'
     f = open('data/sincTrain25.dt')
     data = np.loadtxt(f)
-    create_plots(10000, data, 20, high_)
+    create_plots(10000, data, 20, 0.1)
     
     

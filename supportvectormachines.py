@@ -91,23 +91,71 @@ def accuracy_of_model(C, gamma, dataTrain, dataTest):
     param = svm_parameter('-s 0 -t 2 -c %f -g %f' % (C,gamma))
     m = svm_train(prob, param)
     p_labels, p_acc, p_vals = svm_predict(yTest, xTest, m)
-    return p_acc
+    return p_acc, m
+
+def support_vectors(C, gamma, dataTrain):
+    x = dataTrain[:,0:22].tolist()
+    y = dataTrain[:,-1].tolist()
+    prob = svm_problem(y,x)
+    param = svm_parameter('-s 0 -t 2 -c %f -g %f' % (C,gamma))
+    m = svm_train(prob, param)
+    SV_coefs = m.get_sv_coef()
+    
+    number_of_bounded_SV = len([x for x, in SV_coefs if abs(x) == C])
+    number_of_free_SV = len(SV_coefs) - number_of_bounded_SV
+    return number_of_bounded_SV, number_of_free_SV
+
+def plot_number_of_SV(Cs, gamma, dataTrain):
+    SVs = [support_vectors(c, 0.0001, dataTrainScaled) for c in Cs]
+    bSVs = [b for b,_ in SVs]
+    fSVs = [f for _,f in SVs]
+    plt.plot(Cs, bSVs, 'bo', label='Bounded support vectors')
+    plt.plot(Cs, fSVs, 'ro', label='Free support vectors')
+    plt.legend()
+    plt.xscale('log')
+    plt.savefig('images/support_vectors.%s' % img_format, format=img_format)
 
 
 if __name__ == "__main__":
     """
-    acc_matrix, opt_params = grid_search('data/parkinsonsTrainStatML.dt.scaled',
-                                         'data/parkinsonsTestStatML.dt.scaled')
-    print "optimal hyperparameters"
-    print opt_params
-    plot_accuracies(acc_matrix)
+    dataTrain = sc.get_data('data/parkinsonsTrainStatML.dt')
+    dataTest = sc.get_data('data/parkinsonsTestStatML.dt')
+    
+    accmatrix, (i,j) = cross_validate(dataTrain,5)
+    
+    plot_accuracies(accmatrix,i,j)
+    print best_C_and_gamma(i,j)
+    
+    #print accuracy_of_model(C, gamma, dataTrain, dataTest)
     """
     dataTrain = sc.get_data('data/parkinsonsTrainStatML.dt')
     dataTrainScaled = sc.get_data('data/parkinsonsTrainStatML.dt.scaled')
     dataTest = sc.get_data('data/parkinsonsTestStatML.dt')
-    
-    accmatrix, (i,j) = cross_validate(dataTrainScaled,5)    
+    dataTestScaled = sc.get_data('data/parkinsonsTestStatML.dt.scaled')
 
-    print best_C_and_gamma(i,j)
-    #print accuracy_of_model(C, gamma, dataTrain, dataTest)
+    print r'Computing optimal C and gamma for unscaled training data'
+    accmatrix, (i,j) = cross_validate(dataTrain,5)
+    C,g = best_C_and_gamma(i,j)
+    print "(C, gamma) = ", C,g
+
+    print r'Computing optimal C and gamma for unscaled training data'
+    accmatrix, (i,j) = cross_validate(dataTrainScaled,5)
+    C,g = best_C_and_gamma(i,j)
+    print "(C, gamma) = ", C,g
+
+    print r'Computing training error for scaled data'
+    acc, _ = accuracy_of_model(C, g, dataTrainScaled, dataTrainScaled)
+    print "100 - accuracy = ", 100 - acc[0]
+
+    print r'Computing test error for scaled data'
+    acc, _ = accuracy_of_model(C, g, dataTrainScaled, dataTestScaled)
+    print "100 - accuracy = ", 100 - acc[0]
+    
+    print r'Comparing free and bounded support vectors (see /images/support_vectors.png)'
+    Cs = [1, 10, 100, 1000, 10000, 100000, 1000000]
+    plot_number_of_SV(Cs,0.0001,dataTrainScaled)
+    
+    
+
+    
     
